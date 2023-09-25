@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"test/myzip"
+	"test/mygzip"
 	"time"
 )
 
@@ -350,7 +350,18 @@ func main() {
 	// a, b := filepath.Split(path)
 	// fmt.Println(a, b)
 
-	if err := myzip.Zip("myzip.zip", []byte("abcdefghijklmnop"), "myzip"); err != nil {
+	if err := mygzip.Gzip("myzip.gz", mygzip.DefaultCompression, mygzip.AES192, []byte("012"), "myzip", "mygzip"); err != nil {
 		fmt.Println(err)
 	}
+
+	if err := mygzip.UnGzip("./test", "myzip.gz", mygzip.AES192, []byte("012")); err != nil {
+		fmt.Println(err)
+	}
+
+	// hash := sha256.New()
+	// if _, err := hash.Write([]byte("asadsadgjdsajgkhdkajshfkhakskgfgajsgjhskahkdhkjasas")); err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// fmt.Println(hash.Sum(nil))
 }
