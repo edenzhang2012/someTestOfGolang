@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -71,7 +72,8 @@ func Gzip(dst string, compressLevel, encryptType int, key []byte, src ...string)
 	defer tarWriter.Close()
 
 	for _, f := range src {
-		err = filepath.Walk(f, func(filePath string, fileInfo os.FileInfo, err error) error {
+		baseRoot, basePath := filepath.Split(strings.TrimSuffix(f, string(os.PathSeparator)))
+		err = filepath.Walk(strings.TrimSuffix(f, string(os.PathSeparator)), func(filePath string, fileInfo os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -82,7 +84,13 @@ func Gzip(dst string, compressLevel, encryptType int, key []byte, src ...string)
 				return err
 			}
 
-			header.Name = filepath.ToSlash(filePath)
+			if filePath == strings.TrimSuffix(f, string(os.PathSeparator)) {
+				header.Name = basePath
+			} else {
+				header.Name = filepath.Join(basePath, strings.TrimPrefix(filePath, f))
+			}
+
+			fmt.Printf("%s,%s, %s, %s, %s\n", f, baseRoot, basePath, filePath, header.Name)
 
 			// write header
 			if err := tarWriter.WriteHeader(header); err != nil {
