@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"test/mygzip"
 	"time"
 )
 
@@ -350,13 +349,13 @@ func main() {
 	// a, b := filepath.Split(path)
 	// fmt.Println(a, b)
 
-	if err := mygzip.Gzip("/home/zhangenshi/backup/test/go/myzip.gz", mygzip.DefaultCompression, mygzip.AES192, []byte(""), "/home/zhangenshi/backup/test/go/a/b/c/d/e/f/g/myzip/", "/home/zhangenshi/backup/test/go/a/b/c/d/e/f/g/mygzip/"); err != nil {
-		fmt.Println(err)
-	}
+	// if err := mygzip.Gzip("/home/zhangenshi/backup/test/go/myzip.gz", mygzip.DefaultCompression, mygzip.AES192, []byte(""), "/home/zhangenshi/backup/test/go/myzip/", "/home/zhangenshi/backup/test/go/mygzip/"); err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
-		fmt.Println(err)
-	}
+	// if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
+	// 	fmt.Println(err)
+	// }
 
 	// hash := sha256.New()
 	// if _, err := hash.Write([]byte("asadsadgjdsajgkhdkajshfkhakskgfgajsgjhskahkdhkjasas")); err != nil {
@@ -364,4 +363,10 @@ func main() {
 	// 	return
 	// }
 	// fmt.Println(hash.Sum(nil))
+
+	err := os.Chtimes("/mnt/zes_test", time.UnixMilli(1642693492000), time.UnixMilli(1642693492000))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }

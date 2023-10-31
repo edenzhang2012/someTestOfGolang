@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -78,11 +79,13 @@ func Gzip(dst string, compressLevel, encryptType int, key []byte, src ...string)
 				return err
 			}
 
+			fmt.Println("before file time", fileInfo.ModTime())
 			// generate tar header
 			header, err := tar.FileInfoHeader(fileInfo, filePath)
 			if err != nil {
 				return err
 			}
+			fmt.Println("before header time", header.ModTime)
 
 			if filePath == strings.TrimSuffix(f, string(os.PathSeparator)) {
 				header.Name = basePath
@@ -151,7 +154,7 @@ func UnGzip(dst, src string, encryptType int, key []byte) error {
 	defer zr.Close()
 
 	tr := tar.NewReader(zr)
-
+	dirHeaderList := make([]*tar.Header, 0, 128)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -167,9 +170,10 @@ func UnGzip(dst, src string, encryptType int, key []byte) error {
 		switch header.Typeflag {
 		// if its a dir and it doesn't exist create it (with 0755 permission)
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if err := os.MkdirAll(target, fs.FileMode(header.Mode)); err != nil {
 				return err
 			}
+			dirHeaderList = append(dirHeaderList, header)
 		// if it's a file create it (with same permission)
 		case tar.TypeReg:
 			fileToWrite, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
@@ -181,6 +185,19 @@ func UnGzip(dst, src string, encryptType int, key []byte) error {
 			if _, err := io.Copy(fileToWrite, tr); err != nil {
 				return err
 			}
+			fmt.Println("after time ", header.ModTime)
+			err = os.Chtimes(target, header.AccessTime, header.ModTime)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, header := range dirHeaderList {
+		target := filepath.Join(dst, header.Name)
+		err = os.Chtimes(target, header.AccessTime, header.ModTime)
+		if err != nil {
+			return err
 		}
 	}
 
