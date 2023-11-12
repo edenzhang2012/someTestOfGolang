@@ -2,6 +2,10 @@ module test
 
 go 1.18
 
-require github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
+require github.com/aws/aws-sdk-go v1.47.8
 
-require golang.org/x/crypto v0.13.0 // indirect
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+)

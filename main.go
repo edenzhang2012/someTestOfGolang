@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"test/mygzip"
 	"time"
 )
 
@@ -353,9 +354,9 @@ func main() {
 	// 	fmt.Println(err)
 	// }
 
-	// if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
-	// 	fmt.Println(err)
-	// }
+	if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
+		fmt.Println(err)
+	}
 
 	// hash := sha256.New()
 	// if _, err := hash.Write([]byte("asadsadgjdsajgkhdkajshfkhakskgfgajsgjhskahkdhkjasas")); err != nil {
@@ -364,9 +365,21 @@ func main() {
 	// }
 	// fmt.Println(hash.Sum(nil))
 
-	err := os.Chtimes("/mnt/zes_test", time.UnixMilli(1642693492000), time.UnixMilli(1642693492000))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// err := os.Chtimes("/mnt/zes_test", time.UnixMilli(1642693492000), time.UnixMilli(1642693492000))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
+	// for i := 1; i < 5; i++ {
+	// 	files, _, err := s3.QueryExternalDataSubdirectoryContents("https://obs.cn-east-3.myhuaweicloud.com",
+	// 		"A42DBLYHYEOEGPUXGXRX", "yckRdqGa904eQTvnzdYVlZwfKOQljlj7a4WCyfCe", "cn-east-3", "eden", "aaaa", 5, i)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		return
+	// 	}
+	// 	for _, file := range files {
+	// 		fmt.Printf("%s\n", file.Name())
+	// 	}
+	// }
 }
