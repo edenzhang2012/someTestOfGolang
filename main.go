@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"test/mygzip"
+	"test/threadpool"
 	"time"
 )
 
@@ -354,9 +354,9 @@ func main() {
 	// 	fmt.Println(err)
 	// }
 
-	if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
-		fmt.Println(err)
-	}
+	// if err := mygzip.UnGzip("/home/zhangenshi/backup/test/go/test/", "/home/zhangenshi/backup/test/go/myzip.gz", mygzip.AES192, []byte("")); err != nil {
+	// 	fmt.Println(err)
+	// }
 
 	// hash := sha256.New()
 	// if _, err := hash.Write([]byte("asadsadgjdsajgkhdkajshfkhakskgfgajsgjhskahkdhkjasas")); err != nil {
@@ -382,4 +382,13 @@ func main() {
 	// 		fmt.Printf("%s\n", file.Name())
 	// 	}
 	// }
+
+	fmt.Println(strings.TrimSpace(""))
+
+	poll, err := threadpool.NewThreadPool()
+	if err != nil {
+		fmt.Printf("create thread pool falied with %v\n", err)
+	}
+	fmt.Printf("poll: %s\n", poll.Describe())
+	poll.Stop()
 }
