@@ -15,7 +15,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"test/threadpool"
 	"time"
 )
 
@@ -320,6 +319,19 @@ func Encrypt(src, dst, passwd string) error {
 	return nil
 }
 
+func TurnToBashString(src string) string {
+	fmt.Printf("##### get src %s\n", src)
+	if strings.Contains(src, `'`) || strings.Contains(src, `\`) {
+		src = strings.ReplaceAll(src, `\`, `\\`)
+		src = strings.ReplaceAll(src, `'`, `\'`)
+		src = fmt.Sprintf("$'%s'", src)
+	} else {
+		src = fmt.Sprintf("'%s'", src)
+	}
+	fmt.Printf("##### return src %s\n", src)
+	return src
+}
+
 func main() {
 	// http_test()
 
@@ -383,12 +395,19 @@ func main() {
 	// 	}
 	// }
 
-	fmt.Println(strings.TrimSpace(""))
+	// fmt.Println(strings.TrimSpace(""))
 
-	poll, err := threadpool.NewThreadPool()
-	if err != nil {
-		fmt.Printf("create thread pool falied with %v\n", err)
-	}
-	fmt.Printf("poll: %s\n", poll.Describe())
-	poll.Stop()
+	// poll, err := threadpool.NewThreadPool()
+	// if err != nil {
+	// 	fmt.Printf("create thread pool falied with %v\n", err)
+	// }
+	// fmt.Printf("poll: %s\n", poll.Describe())
+	// poll.Stop()
+
+	cmd := TurnToBashString(`123'12\34`)
+	fmt.Println(cmd)
+	cmd = fmt.Sprintf("%s -C %s", cmd, "aaa")
+	fmt.Println(cmd)
+
+	// slices.SortFunc[]()
 }
