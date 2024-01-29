@@ -15,7 +15,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"test/mongodb"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/mgo.v2/bson"
 )
 
 func trace(s string) {
@@ -404,10 +409,38 @@ func main() {
 	// fmt.Printf("poll: %s\n", poll.Describe())
 	// poll.Stop()
 
-	cmd := TurnToBashString(`123'12\34`)
-	fmt.Println(cmd)
-	cmd = fmt.Sprintf("%s -C %s", cmd, "aaa")
-	fmt.Println(cmd)
+	// cmd := TurnToBashString(`123'12\34`)
+	// fmt.Println(cmd)
+	// cmd = fmt.Sprintf("%s -C %s", cmd, "aaa")
+	// fmt.Println(cmd)
 
-	// slices.SortFunc[]()
+	dsn := "mongodb://root:password@10.12.10.56:37017/?authMechanism=SCRAM-SHA-1&authSource=admin&directConnection=true"
+	mongodb.InitMongodb(dsn, 0)
+
+	if err := mongodb.Index("pavostor", "task", []mongo.IndexModel{
+		{
+			Keys:    bson.M{"expire": 1}, //1表示升序，-1表示降序
+			Options: options.Index().SetExpireAfterSeconds(0),
+		}}); err != nil {
+		fmt.Println("error: ", err)
+		return
+	}
+
+	task := mongodb.Task{
+		TaskId: "aaaaaaaaaa",
+		Expire: time.Now().Add(30 * time.Second),
+	}
+	if err := task.Insert(); err != nil {
+		fmt.Println("error: ", err)
+		return
+	}
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(20 * time.Second)
+		task.Expire = time.Now().Add(30 * time.Second)
+		if err := task.Update(); err != nil {
+			fmt.Println("error: ", err)
+			return
+		}
+	}
 }
