@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,13 +16,25 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"test/mongodb"
 	"time"
-
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
+
+var (
+	client    *http.Client
+	Transport *http.Transport
+)
+
+func init() {
+	Transport = &http.Transport{
+		//DisableKeepAlives:   true, //关闭连接复用
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+		MaxIdleConns:        1,
+		MaxIdleConnsPerHost: 1,
+	}
+	client = &http.Client{
+		Transport: Transport,
+	}
+}
 
 func trace(s string) {
 	pc, _, line, ok := runtime.Caller(1)
@@ -60,8 +73,7 @@ func filepath_test2() {
 }
 
 func SimpleHttp(ctx context.Context, method, rawUrl string, params *url.Values, headers map[string]string) (body []byte, err error) {
-	fmt.Printf("SimpleHttp method %s, haeders %v, rawUrl %s, params %v", method, headers, rawUrl, params)
-
+	var ErrConflict = errors.New("geminifs lock conflict")
 	u, err := url.ParseRequestURI(rawUrl)
 	if err != nil {
 		return nil, err
@@ -81,10 +93,10 @@ func SimpleHttp(ctx context.Context, method, rawUrl string, params *url.Values, 
 	}
 
 	var res *http.Response
-	if ctx == nil {
-		res, err = (&http.Client{}).Do(req)
+	if ctx == context.TODO() {
+		res, err = client.Do(req)
 	} else {
-		res, err = (&http.Client{}).Do(req.WithContext(ctx))
+		res, err = client.Do(req.WithContext(ctx))
 	}
 	if err != nil {
 		return nil, err
@@ -107,9 +119,14 @@ func SimpleHttp(ctx context.Context, method, rawUrl string, params *url.Values, 
 			return nil, os.ErrNotExist
 		}
 
+		if res.StatusCode == 409 {
+			return nil, ErrConflict
+		}
+
 		if len(body) > 0 {
+			fmt.Println("SimpleHttp get res: code ", res.StatusCode, " body ", string(body))
 			if err := json.Unmarshal(body, &resp); err != nil {
-				fmt.Printf("SimpleHttp unmarshal failed with %v", err)
+				fmt.Println("SimpleHttp unmarshal failed with ", err)
 				return nil, err
 			}
 
@@ -118,15 +135,16 @@ func SimpleHttp(ctx context.Context, method, rawUrl string, params *url.Values, 
 					return nil, os.ErrExist
 				}
 
-				if strings.Contains(resp.Err, "not found") || strings.Contains(resp.Err, "not exist") {
+				if strings.Contains(resp.Err, "not found") || strings.Contains(resp.Err, "not exist") || strings.Contains(resp.Err, "is already stopped") /*在线同步取消场景*/ {
 					return nil, os.ErrNotExist
 				}
 
-				fmt.Printf("SimpleHttp failed with: %s", resp.Err)
+				fmt.Printf("SimpleHttp failed with: %s\n", resp.Err)
 				return nil, fmt.Errorf("SimpleHttp failed with: %s", resp.Err)
 			}
+		} else {
+			return nil, fmt.Errorf("SimpleHttp failed with http status %d and empty body", res.StatusCode)
 		}
-		return nil, fmt.Errorf("SimpleHttp failed with http status %d and empty body", res.StatusCode)
 	}
 
 	//success
@@ -171,13 +189,33 @@ type SnapInfo struct {
 }
 
 func http_test() {
-	// params := url.Values{}
-	// params.Add("logicalPath", "traindata/space4/user4/dataset441/latest")
-	// params.Add("realPath", "/pavostor/gemini/traindata/user_uuid_1/base1")
-	// err := SimpleHttp("POST", "http://localhost:8888/snap/mark", &params, nil)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	for i := 0; i < 100; i++ {
+		params := url.Values{}
+		params.Add("startFrom", strconv.Itoa(1))
+		params.Add("limit", strconv.Itoa(100))
+		rawUrl := "http://10.244.40.236:8888/Gemini-Snapshot/codeset/wfmvnrnit4up/1/393035500987879424/latest"
+		rawUrl = rawUrl + "?" + params.Encode()
+		go func() {
+			body, err := SimpleHttp(context.TODO(), "GET", rawUrl, nil, map[string]string{"Accept": "application/json"})
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(string(body))
+		}()
+	}
+
+	for i := 1; i < 7; i++ {
+		str := fmt.Sprintf("http://10.244.40.236:8888/Gemini-Snapshot/codeset/wfmvnrnit4up/1/393035500987879424/latest/%d.txt", i)
+		go func() {
+			body, err := SimpleHttp(context.TODO(), "DELETE", str, nil, nil)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(string(body))
+		}()
+	}
+
+	time.Sleep(100 * time.Second)
 
 	// var data Dataset
 	// params := url.Values{}
@@ -221,28 +259,28 @@ func http_test() {
 	// 	fmt.Println(snaps)
 	// }
 
-	rawUrl := filerPath("/t123H就sbajd%jsahh.jpg")
-	params := url.Values{}
-	params.Add("metadata", "true")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	body, err := SimpleHttp(ctx, "GET", rawUrl, &params, nil)
-	if err != nil {
-		if err == context.DeadlineExceeded {
-			fmt.Println("aaaaaaa")
-		}
+	// rawUrl := filerPath("/t123H就sbajd%jsahh.jpg")
+	// params := url.Values{}
+	// params.Add("metadata", "true")
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// defer cancel()
+	// body, err := SimpleHttp(ctx, "GET", rawUrl, &params, nil)
+	// if err != nil {
+	// 	if err == context.DeadlineExceeded {
+	// 		fmt.Println("aaaaaaa")
+	// 	}
 
-		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Println("bbbbbbb")
-		}
+	// 	if errors.Is(err, context.DeadlineExceeded) {
+	// 		fmt.Println("bbbbbbb")
+	// 	}
 
-		if err, ok := err.(*url.Error); ok && err.Timeout() {
-			fmt.Println("ccccc")
-		}
-		fmt.Println(err)
-	} else {
-		fmt.Println(string(body))
-	}
+	// 	if err, ok := err.(*url.Error); ok && err.Timeout() {
+	// 		fmt.Println("ccccc")
+	// 	}
+	// 	fmt.Println(err)
+	// } else {
+	// 	fmt.Println(string(body))
+	// }
 }
 
 func filerPath(path string) string {
@@ -414,33 +452,37 @@ func main() {
 	// cmd = fmt.Sprintf("%s -C %s", cmd, "aaa")
 	// fmt.Println(cmd)
 
-	dsn := "mongodb://root:password@10.12.10.56:37017/?authMechanism=SCRAM-SHA-1&authSource=admin&directConnection=true"
-	mongodb.InitMongodb(dsn, 0)
+	// dsn := "mongodb://root:password@10.12.10.56:37017/?authMechanism=SCRAM-SHA-1&authSource=admin&directConnection=true"
+	// mongodb.InitMongodb(dsn, 0)
 
-	if err := mongodb.Index("pavostor", "task", []mongo.IndexModel{
-		{
-			Keys:    bson.M{"expire": 1}, //1表示升序，-1表示降序
-			Options: options.Index().SetExpireAfterSeconds(0),
-		}}); err != nil {
-		fmt.Println("error: ", err)
-		return
-	}
+	// if err := mongodb.Index("pavostor", "task", []mongo.IndexModel{
+	// 	{
+	// 		Keys:    bson.M{"expire": 1}, //1表示升序，-1表示降序
+	// 		Options: options.Index().SetExpireAfterSeconds(0),
+	// 	}}); err != nil {
+	// 	fmt.Println("error: ", err)
+	// 	return
+	// }
 
-	task := mongodb.Task{
-		TaskId: "aaaaaaaaaa",
-		Expire: time.Now().Add(30 * time.Second),
-	}
-	if err := task.Insert(); err != nil {
-		fmt.Println("error: ", err)
-		return
-	}
+	// task := mongodb.Task{
+	// 	TaskId: "aaaaaaaaaa",
+	// 	Expire: time.Now().Add(30 * time.Second),
+	// }
+	// if err := task.Insert(); err != nil {
+	// 	fmt.Println("error: ", err)
+	// 	return
+	// }
 
-	for i := 0; i < 10; i++ {
-		time.Sleep(20 * time.Second)
-		task.Expire = time.Now().Add(30 * time.Second)
-		if err := task.Update(); err != nil {
-			fmt.Println("error: ", err)
-			return
-		}
-	}
+	// for i := 0; i < 10; i++ {
+	// 	time.Sleep(20 * time.Second)
+	// 	task.Expire = time.Now().Add(30 * time.Second)
+	// 	if err := task.Update(); err != nil {
+	// 		fmt.Println("error: ", err)
+	// 		return
+	// 	}
+	// }
+	// tmpTime := time.Now()
+	// tmpTimeStr := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tmpTime.Year(), tmpTime.Month(), tmpTime.Day(), tmpTime.Hour(), tmpTime.Minute(), tmpTime.Second())
+	// fmt.Println(tmpTimeStr)
+	DirSize()
 }
