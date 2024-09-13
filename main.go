@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -375,7 +376,112 @@ func TurnToBashString(src string) string {
 	return src
 }
 
+func workerA(num int, ch chan struct{}, wg *sync.WaitGroup) {
+	fmt.Println(num, "start")
+	sleepTime := num/3 + 1
+	time.Sleep(time.Duration(sleepTime))
+	fmt.Println(num, "end")
+	ch <- struct{}{}
+	wg.Done()
+}
+
+func dealWithOfflineSyncData(worker func(int, chan struct{}, *sync.WaitGroup), maxThreads, total int) {
+	if maxThreads >= total {
+		maxThreads = total
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(total)
+	ch := make(chan struct{}, maxThreads)
+	processed := 0
+	done := 0
+
+	for i := 0; i < maxThreads; i++ {
+		processed++
+		go worker(i, ch, &wg)
+	}
+
+	for {
+		<-ch
+		done++
+
+		if processed >= total {
+			break
+		}
+
+		processed++
+		go worker(maxThreads+done-1, ch, &wg)
+	}
+
+	wg.Wait()
+}
+
+func TurnOldRealPathToLogicalPath(path string) (string, string, error) {
+	hasTail := false
+	tmpStr := strings.TrimPrefix(path, "/pavostor")
+	tmpStr = strings.TrimPrefix(tmpStr, "/gemini/")
+	if strings.HasSuffix(tmpStr, "/") {
+		hasTail = true
+		tmpStr = strings.TrimSuffix(tmpStr, "/")
+	}
+
+	strs := strings.Split(tmpStr, "/")
+
+	logicalPath := ""
+	suffix := ""
+	switch strs[0] {
+	case "codeset":
+		if len(strs) < 4 {
+			return "", "", fmt.Errorf("path %s is invalid", path)
+		}
+		logicalPath = filepath.Join(strs[0], strs[1], "padding", strs[2], strs[3])
+		if hasTail && len(strs) > 4 {
+			suffix = filepath.Join(strs[4:]...) + "/"
+		} else {
+			suffix = filepath.Join(strs[4:]...)
+		}
+		return logicalPath, suffix, nil
+	case "model", "output", "traindata":
+		if len(strs) < 3 {
+			return "", "", fmt.Errorf("path %s is invalid", path)
+		}
+		logicalPath = filepath.Join(strs[0], strs[1], "padding", strs[2], "padding")
+		if hasTail && len(strs) > 3 {
+			suffix = filepath.Join(strs[3:]...) + "/"
+		} else {
+			suffix = filepath.Join(strs[3:]...)
+		}
+		return logicalPath, suffix, nil
+	default:
+		return "", "", fmt.Errorf("type %s, path %s is invalid", strs[0], path)
+	}
+}
+
 func main() {
+	logical, suffix, err := TurnOldRealPathToLogicalPath("/gemini/codeset/y160hxjsfe5y/486804894558007296/latest/occgkstpzsrhnraocxev")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/traindata/y160hxjsfe5y/486804894558007296/occgkstpzsrhnraocxev")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/codeset/y160hxjsfe5y/486804894558007296/latest")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/traindata/y160hxjsfe5y/486804894558007296")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/codeset/y160hxjsfe5y/486804894558007296/latest/")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/traindata/y160hxjsfe5y/486804894558007296/")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/codeset/y160hxjsfe5y/486804894558007296/latest/occgkstpzsrhnraocxev/a/b/c/")
+	fmt.Println(logical, suffix, err)
+
+	logical, suffix, err = TurnOldRealPathToLogicalPath("/gemini/traindata/y160hxjsfe5y/486804894558007296/occgkstpzsrhnraocxev/a/b/c/")
+	fmt.Println(logical, suffix, err)
+	return
 	// http_test()
 
 	// foo("test")
@@ -484,5 +590,22 @@ func main() {
 	// tmpTime := time.Now()
 	// tmpTimeStr := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tmpTime.Year(), tmpTime.Month(), tmpTime.Day(), tmpTime.Hour(), tmpTime.Minute(), tmpTime.Second())
 	// fmt.Println(tmpTimeStr)
-	DirSize()
+	// DirSize()
+
+	// err := os.MkdirAll("aaa", os.ModePerm)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// } else {
+	// 	fmt.Println("success")
+	// }
+
+	// file, err := os.OpenFile("aaa/a.txt", os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// } else {
+	// 	fmt.Println("success")
+	// 	file.Close()
+	// }
+
+	dealWithOfflineSyncData(workerA, 8, 12)
 }
